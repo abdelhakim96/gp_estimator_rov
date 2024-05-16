@@ -1,0 +1,3 @@
+[submodule "libraries/GPKit"]
+	path = libraries/GPKit
+	url = git@github.com:abdelhakim96/GPKit.git
