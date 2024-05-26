@@ -20,11 +20,14 @@
 #include "rclcpp/rclcpp.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include <iostream>
 #include <future>
 #include <thread>
 #include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/wrench.hpp"
+#include "gp_fast_sgp.h"
+#include "gp_sgp.h"
 
 // Global variables
 rclcpp::Time start_time;
@@ -75,5 +78,7 @@ double cov_y = 0.0;
 
 Eigen::MatrixXd mu_z = Eigen::MatrixXd::Zero(1, 1);
 double cov_z = 0.0;
-
-
+bool traj_on = 0;
+bool opt_x_done = 0;
+bool opt_y_done = 0;
+bool opt_z_done = 0;
