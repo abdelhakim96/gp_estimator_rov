@@ -61,6 +61,7 @@
         "typeinfo": "cpp",
         "variant": "cpp",
         "bitset": "cpp",
-        "core": "cpp"
+        "core": "cpp",
+        "deque": "cpp"
     }
 }

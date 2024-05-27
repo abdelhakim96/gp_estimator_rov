@@ -6,11 +6,11 @@
 class GP : public rclcpp::Node {
 public:
    int rate_gp_ = 20;
-   int input_size_ = 120;
+   int input_size_ = 110;
    int skip_ = 1;
 
    double lambda_ = 0.97;
-   int training_size_ = int(input_size_/2);
+   int training_size_ = int(input_size_-20);
 
     GP() : Node("gp_node")
      {
@@ -124,7 +124,6 @@ public:
           
            fgp_x_.fast_online_update(gp_x_Xdata, gp_x_Ydata(0, 0), false, input_size_, 25, 5, 0.1, -1, false);
 
-                              //std::cout<< "traj_on " <<traj_on <<std::endl ;
 
 
    if (traj_on)
@@ -136,7 +135,7 @@ public:
             if (fgp_x_.getDataSize() == training_size_)
             {
                     std::cout<<"Started Hyperparam optimization in x  "<<std::endl;
-                    //fgp_x_.Optimize_hyperparams();
+                    fgp_x_.Optimize_hyperparams();
                     opt_x_done = 1;
 
                     std::cout<<"optimization Done "<<std::endl;
@@ -146,12 +145,12 @@ public:
 
 
 
-            if (fgp_x_.getDataSize()>=10){
+            if (fgp_x_.getDataSize()>=training_size_){
                  
 
                 std::tie(mu_x, cov_x) = fgp_x_.predict(gp_x_Xpred);
 
-                std::cout<< "mu_x"<< mu_x <<std::endl ;
+                //std::cout<< "mu_x"<< mu_x <<std::endl ;
                  
             	//fgp_x_.remove_sample();
             }
@@ -222,10 +221,10 @@ public:
 
             }
 
-             if (fgp_y_.getDataSize()>=10){
+             if (fgp_y_.getDataSize()>=training_size_){
 
                 std::tie(mu_y, cov_y) = fgp_y_.predict(gp_y_Xpred);
-                 std::cout<< "mu_y"<< mu_y <<std::endl ;
+                // std::cout<< "mu_y"<< mu_y <<std::endl ;
 
             	//gp_y_.remove_sample();
             }
@@ -318,22 +317,21 @@ public:
         std_msgs::msg::Float64MultiArray msgx;
         std_msgs::msg::Float64MultiArray msgy;
         std_msgs::msg::Float64MultiArray msgz;
-        msg.data = {mu_x(0, 0), mu_y(0, 0), mu_z(0, 0)};
-      for (int i = 0; i < 1; ++i) {
+        msg.data = {mu_x(0, 0), mu_y(0, 0), 0.0};
+
         msgx.data.push_back(mu_x(0, 0));
         msgy.data.push_back(mu_y(0, 0));
-        msgz.data.push_back(mu_z(0, 0));
-    }
+        msgz.data.push_back(0.0);
+
 
         
         gp_pred_mu_publisher_->publish(msg);
         
-        if (opt_x_done && opt_y_done && opt_z_done )
-{
+        
         gp_pred_mu_x_publisher_->publish(msgx);
         gp_pred_mu_y_publisher_->publish(msgy);
         gp_pred_mu_z_publisher_->publish(msgz);
-}
+
     }
 
     void publish_cov_pred(const double& cov_x, const double& cov_y, const double& cov_z) {
