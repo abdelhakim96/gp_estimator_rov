@@ -5,13 +5,12 @@
 
 class GP : public rclcpp::Node {
 public:
-   int rate_gp_ = 10;
-   int input_size_ = 110;
+   int rate_gp_ = 20;
+   int input_size_ = 120;
    int skip_ = 1;
 
    double lambda_ = 0.97;
-   int training_size_ = 90;
- //  FastSGP fgp_x_; // Declare FastSGP as a member
+   int training_size_ = int(input_size_/2);
 
     GP() : Node("gp_node")
      {
@@ -66,26 +65,15 @@ public:
         Eigen::VectorXd theta_0 = Eigen::VectorXd::Ones(5);
        
         gp_x_ = GaussianProcess(Eigen::VectorXd::Ones(1), Eigen::VectorXd::Ones(4).transpose(), theta_0);
-        gp_y_ = GaussianProcess(Eigen::VectorXd::Ones(1), Eigen::VectorXd::Ones(4).transpose(), theta_0);
-        gp_z_ = GaussianProcess(theta_0);
+        gp_y_ = GaussianProcess(Eigen::VectorXd::Ones(1),Eigen::VectorXd::Ones(4).transpose(), theta_0);
+        gp_z_ = GaussianProcess(Eigen::VectorXd::Ones(1),Eigen::VectorXd::Ones(4).transpose(), theta_0);
         
 
         fgp_x_ = FastSGP(gp_x_);
         fgp_y_ = FastSGP(gp_y_);
-        fgp_z_ = FastSGP(gp_x_);
+        fgp_z_ = FastSGP(gp_z_);
 
-        //GaussianProcess base_gp(theta_0);
-
-       // 
-       //fgp_x_ = FastSGP( base_gp);
-       // fgp_y_ = FastSGP(GaussianProcess(theta_0));
-       // fgp_z_ = FastSGP(GaussianProcess(theta_0));
-
-        //fgp_x_ = FastSGP( gp_x_);
-       // fgp_y_ = FastSGP( GaussianProcess(Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), theta_0));
-        //fgp_z_ = FastSGP( GaussianProcess(Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), theta_0));
-
-        //fgp_x_ = FastSGP(theta_0,  Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1));
+    
         publish_mu_pred();
         publish_gp_init();
     }
@@ -97,14 +85,15 @@ public:
    
 
     void predictGPX() {
-        rclcpp::Rate rate(10); // 10 Hz
+        rclcpp::Rate rate(rate_gp_); // 10 Hz
 
         while (rclcpp::ok()) {
             // Extract states for GP_x prediction (assuming current_states is available)
             // Use first 3 states for GP_x input
             // ...
 
-             Eigen::MatrixXd gp_x_Xdata(1, 4);
+             Eigen::MatrixXd gp_x_Xdata(1,4);
+             
              Eigen::MatrixXd gp_x_Xpred(1, 4);
              Eigen::MatrixXd gp_x_Ydata(1, 1);
              
@@ -132,59 +121,38 @@ public:
          
 	         gp_x_Ydata(0, 0) = Fx_dist ;
              Fx_dist_t = Fx_dist;  //disturbance at t-1
-             
-            // fgp_x_.add_sample(gp_x_Ydata(0, 0), gp_x_Xdata);
-            //Eigen::VectorXd theta_0 = gp_x_.getHyperparams();
-            //FastSGP fgp_x_(gp_x_.getX(), gp_x_.getY(), theta_0);
+          
+           fgp_x_.fast_online_update(gp_x_Xdata, gp_x_Ydata(0, 0), false, input_size_, 25, 5, 0.1, -1, false);
+
+                              //std::cout<< "traj_on " <<traj_on <<std::endl ;
 
 
    if (traj_on)
 
             {
-            std::cout<<"size gp  "<< fgp_x_.getDataSize() << std::endl;
-
-             
-             fgp_x_.add_sample(gp_x_Ydata(0, 0), gp_x_Xdata);
-        
-          
-          
-           // GaussianProcess gp(Eigen::VectorXd::Ones(1), Eigen::VectorXd::Ones(1), Eigen::VectorXd::Ones(2));
-            
-           Eigen::VectorXd theta_0 = fgp_x_.getHyperparams();
-           Eigen::VectorXd new_theta_0 = theta_0.segment(1, theta_0.size() - 1);
-          
 
             
-            //FastSGP fgp_x_(gp_x_);
-            
-            
-            
-            //FastSGP fgp_x_(gp);
-
-            //FastSGP fgp_x_(gp_x_.getY(), gp_x_.getX(), gp_x_.getHyperparams());
 
             if (fgp_x_.getDataSize() == training_size_)
             {
                     std::cout<<"Started Hyperparam optimization in x  "<<std::endl;
-                    fgp_x_.Optimize_hyperparams();
+                    //fgp_x_.Optimize_hyperparams();
                     opt_x_done = 1;
 
                     std::cout<<"optimization Done "<<std::endl;
-                    //Eigen::VectorXd theta_0 = gp_x_.getHyperparams();
-                    //Eigen::MatrixXd X = gp_x_.getX();
-                    //Eigen::VectorXd Y = gp_x_.getY();
+                   
                     
             }
 
 
 
-            if (fgp_x_.getDataSize()>input_size_){
+            if (fgp_x_.getDataSize()>=10){
                  
- 
+
                 std::tie(mu_x, cov_x) = fgp_x_.predict(gp_x_Xpred);
 
                 std::cout<< "mu_x"<< mu_x <<std::endl ;
-                  fgp_x_.fast_online_update(gp_x_Xdata, gp_x_Ydata(0, 0), true, 110, 25, 5, 0.01, -1, true);
+                 
             	//fgp_x_.remove_sample();
             }
 
@@ -192,9 +160,7 @@ public:
             }
 
 
-            //std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Adjust as needed
-             //FastSGP fsgp(gp_x_);
-
+      
             rate.sleep();
 
 
@@ -206,7 +172,7 @@ public:
 
 
      void predictGPY() {
-        rclcpp::Rate rate(10); // 10 Hz
+        rclcpp::Rate rate(rate_gp_); // 10 Hz
 
         while (rclcpp::ok())  {
             // Extract states for GP_y prediction (assuming current_states is available)
@@ -240,15 +206,13 @@ public:
 	         gp_y_Ydata(0, 0) = Fy_dist;
 
              Fy_dist_t = Fy_dist;  //disturbance at t-1
+             fgp_y_.fast_online_update(gp_y_Xdata, gp_y_Ydata(0, 0), false, input_size_, 25, 5, 0.1, -1, false);
 
    if (traj_on)
 
             {
 
-             fgp_y_.add_sample(gp_y_Ydata(0, 0), gp_y_Xdata);
             
-
-
          	if (fgp_y_.getDataSize()==training_size_)
             {
                     std::cout<<"Started hyperparam optmization in y "<<std::endl;
@@ -258,21 +222,17 @@ public:
 
             }
 
-
-
-             
-             if (fgp_y_.getDataSize()>input_size_){
+             if (fgp_y_.getDataSize()>=10){
 
                 std::tie(mu_y, cov_y) = fgp_y_.predict(gp_y_Xpred);
-                                std::cout<< "mu_y"<< mu_y <<std::endl ;
+                 std::cout<< "mu_y"<< mu_y <<std::endl ;
 
-            	fgp_y_.remove_sample();
+            	//gp_y_.remove_sample();
             }
             }
-            //std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Adjust as needed
             rate.sleep();
 
-                    this->prediction_counter_++;
+            this->prediction_counter_++;
         
         }
 
@@ -281,7 +241,7 @@ public:
     }
 
          void predictGPZ() {
-         rclcpp::Rate rate(10); // 10 Hz
+         rclcpp::Rate rate(rate_gp_); // 10 Hz
            
         while (rclcpp::ok())  {
             // Extract states for GP_y prediction (assuming current_states is available)
@@ -388,8 +348,8 @@ public:
     GaussianProcess gp_y_;
     GaussianProcess gp_z_;
     FastSGP fgp_x_;
-    GaussianProcess fgp_y_;
-    GaussianProcess fgp_z_;
+    FastSGP fgp_y_;
+    FastSGP fgp_z_;
 
 private:
 
@@ -462,11 +422,6 @@ void GP::odom_cb(const nav_msgs::msg::Odometry::SharedPtr msg) {
 
 
 
-
-
-
-
-
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
      auto gp_node = std::make_shared<GP>();
@@ -480,22 +435,15 @@ int main(int argc, char** argv) {
     rclcpp::Rate rate(10); // 10 Hz
     
     
-    
-    Eigen::VectorXd theta_0(2);
-    theta_0 << 1, 1.0; //initial guess
-    //GaussianProcess gp(Eigen::VectorXd::Ones(1), Eigen::VectorXd::Ones(1), theta_0);
-    //FastSGP fastgp(gp);
-
-        while (rclcpp::ok()){ 
+    while (rclcpp::ok()){ 
       
 
-       //if (traj_on==true){
-       gp_node->publish_gp_init();
-        gp_node->publish_mu_pred();
+    gp_node->publish_gp_init();
+    gp_node->publish_mu_pred();
         
-        gp_node->prediction_counter_ = 0; // Reset the counter
-        rclcpp::spin_some(gp_node);
-        rate.sleep(); // Ensure the loop runs at 10 Hz
+    gp_node->prediction_counter_ = 0; // Reset the counter
+    rclcpp::spin_some(gp_node);
+    rate.sleep(); // Ensure the loop runs at 10 Hz
 
 	    
 	}
